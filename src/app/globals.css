@@ -137,3 +137,22 @@ table.rep td.acc { text-align: right; white-space: nowrap; }
   h2 { break-after: avoid; }
   table.rep { border-radius: 0; }
 }
+
+/* Abierto / Club cerrado y días especiales */
+.turno .head { flex-wrap: wrap; }
+.turno .estado { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.toggle { font-family: var(--f-mono); font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: 999px; padding: 4px 10px; border: 1.5px solid var(--ok); background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+.toggle:hover:not(:disabled) { filter: brightness(.96); }
+.toggle.on { border-color: var(--text); background: var(--text); color: #fff; }
+.toggle:disabled { opacity: .55; cursor: default; }
+.turno.club-cerrado { background: repeating-linear-gradient(135deg, #f3f1ec 0 10px, #eeebe4 10px 20px); border-left-color: var(--text); }
+.turno.club-cerrado .head { margin-bottom: 0; }
+.turno.club-cerrado .date { color: var(--muted); }
+.aviso-cerrado { margin: 8px 0 0; font-size: .9rem; color: var(--muted); }
+.turno.especial { border-left-color: var(--yellow); }
+.turno.especial.asignado { border-left-color: var(--jueves); }
+.badge.especial { background: var(--yellow); color: var(--text); margin-left: 8px; vertical-align: 2px; }
+
+/* Admin: formulario de día especial */
+.fila-form { display: flex; gap: 8px; }
+.fila-form input { flex: 1; }

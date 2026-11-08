@@ -14,3 +14,4 @@ export function db() {
 
 export const TABLE = 'bar_voluntarios';
 export const NOMBRES = 'bar_voluntarios_nombres';
+export const ESPECIALES = 'bar_dias_especiales';

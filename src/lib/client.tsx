@@ -61,6 +61,7 @@ export function useYear(defecto: () => number = () => new Date().getFullYear()):
 
 export function useTurnos(year: number, endpoint = '/api/jueves', loginUrl = '/login') {
   const [turnos, setTurnos] = useState<Record<string, Turno> | null>(null);
+  const [especiales, setEspeciales] = useState<string[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
     let cancel = false;
@@ -74,12 +75,13 @@ export function useTurnos(year: number, endpoint = '/api/jueves', loginUrl = '/l
         if (cancel) return;
         const map: Record<string, Turno> = {};
         for (const t of j.turnos as Turno[]) map[t.fecha] = t;
+        setEspeciales(j.especiales ?? []);
         setTurnos(map);
       })
       .catch((e) => !cancel && setError(e.message));
     return () => { cancel = true; };
   }, [year, endpoint, loginUrl]);
-  return { turnos, setTurnos, error };
+  return { turnos, setTurnos, especiales, error };
 }
 
 /** Pantalla de contraseña reutilizada por la app y por el admin. */

@@ -29,3 +29,13 @@ on conflict do nothing;
 
 -- Jueves ya pasados: cerrados salvo que el admin los desbloquee
 alter table public.bar_voluntarios add column if not exists desbloqueado boolean not null default false;
+
+-- Días especiales (no jueves) y "club cerrado"
+alter table public.bar_voluntarios drop constraint if exists bar_voluntarios_fecha_check;
+alter table public.bar_voluntarios add column if not exists cerrado boolean not null default false;
+create table if not exists public.bar_dias_especiales (
+  fecha      date primary key check (extract(isodow from fecha) <> 4),
+  created_at timestamptz not null default now()
+);
+alter table public.bar_dias_especiales enable row level security;
+revoke all on table public.bar_dias_especiales from anon, authenticated;

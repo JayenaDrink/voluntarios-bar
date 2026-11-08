@@ -1,20 +1,23 @@
 'use client';
 import { useMemo } from 'react';
 import { Header, YearBar, useTurnos, useYear } from '@/lib/client';
-import { Turno, fechaCorta, fechaLarga, hoyISO, juevesDelAno } from '@/lib/dates';
+import { Turno, diasDelAno, fechaCorta, fechaLarga, hoyISO, isJueves } from '@/lib/dates';
 
 export default function Reporte() {
   const [year, setYear] = useYear();
-  const { turnos, error } = useTurnos(year);
+  const { turnos, especiales, error } = useTurnos(year);
   const hoy = hoyISO();
 
   const r = useMemo(() => {
     if (!turnos) return null;
-    const fechas = juevesDelAno(year);
-    const con = (f: string) => !!(turnos[f]?.voluntario_1 || turnos[f]?.voluntario_2);
+    // Jueves + días especiales; los días con el club cerrado no cuentan
+    const fechas = diasDelAno(year, especiales);
+    const cerrado = (f: string) => !!turnos[f]?.cerrado;
+    const con = (f: string) => !cerrado(f) && !!(turnos[f]?.voluntario_1 || turnos[f]?.voluntario_2);
     const pasados = fechas.filter((f) => f < hoy && con(f)).map((f) => turnos[f]).reverse();
     const futuros = fechas.filter((f) => f >= hoy && con(f)).map((f) => turnos[f]);
-    const libres = fechas.filter((f) => f >= hoy && !con(f));
+    const libres = fechas.filter((f) => f >= hoy && !con(f) && !cerrado(f));
+    const cerrados = fechas.filter((f) => f >= hoy && cerrado(f));
 
     // Resumen por persona (sin distinguir mayúsculas/espacios)
     const per = new Map<string, { nombre: string; hechos: number; proximos: number; ultimo: string; siguiente: string }>();
@@ -27,11 +30,11 @@ export default function Reporte() {
       else { p.proximos++; if (!p.siguiente || f < p.siguiente) p.siguiente = f; }
       per.set(k, p);
     };
-    for (const f of fechas) { const t = turnos[f]; if (t) { add(t.voluntario_1, f); add(t.voluntario_2, f); } }
+    for (const f of fechas) { const t = turnos[f]; if (t && !t.cerrado) { add(t.voluntario_1, f); add(t.voluntario_2, f); } }
     const personas = [...per.values()].sort((a, b) => b.hechos + b.proximos - (a.hechos + a.proximos) || a.nombre.localeCompare(b.nombre, 'es'));
 
-    return { pasados, futuros, libres, personas };
-  }, [turnos, year, hoy]);
+    return { pasados, futuros, libres, cerrados, personas };
+  }, [turnos, especiales, year, hoy]);
 
   return (
     <>
@@ -48,16 +51,19 @@ export default function Reporte() {
       {r && (
         <>
           <div className="kpis">
-            <div className="kpi"><b>{r.pasados.length}</b><span className="muted small">jueves trabajados</span></div>
-            <div className="kpi"><b>{r.futuros.length}</b><span className="muted small">jueves asignados</span></div>
-            <div className="kpi"><b>{r.libres.length}</b><span className="muted small">jueves libres por cubrir</span></div>
+            <div className="kpi"><b>{r.pasados.length}</b><span className="muted small">días trabajados</span></div>
+            <div className="kpi"><b>{r.futuros.length}</b><span className="muted small">días asignados</span></div>
+            <div className="kpi"><b>{r.libres.length}</b><span className="muted small">días libres por cubrir</span></div>
           </div>
 
           <h2>Próximos turnos (van a trabajar)</h2>
           <Tabla filas={r.futuros} vacio="No hay turnos asignados." />
 
           {r.libres.length > 0 && (
-            <p className="small"><b>Jueves libres:</b> <span className="muted">{r.libres.map(fechaCorta).join(' · ')}</span></p>
+            <p className="small"><b>Días libres:</b> <span className="muted">{r.libres.map(fechaCorta).join(' · ')}</span></p>
+          )}
+          {r.cerrados.length > 0 && (
+            <p className="small"><b>Club cerrado:</b> <span className="muted">{r.cerrados.map(fechaCorta).join(' · ')}</span></p>
           )}
 
           <h2>Turnos realizados (trabajaron)</h2>
@@ -98,7 +104,7 @@ function Tabla({ filas, vacio }: { filas: Turno[]; vacio: string }) {
         <tbody>
           {filas.map((t) => (
             <tr key={t.fecha}>
-              <td className="fecha">{fechaLarga(t.fecha).replace('jueves ', '')}</td>
+              <td className="fecha" style={{ textTransform: 'capitalize' }}>{fechaLarga(t.fecha)}{!isJueves(t.fecha) && <span className="badge especial">★</span>}</td>
               <td>{[t.voluntario_1, t.voluntario_2].filter(Boolean).join(' y ')}</td>
               <td className="nota">{t.descripcion}</td>
             </tr>

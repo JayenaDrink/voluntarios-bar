@@ -3,7 +3,8 @@ export type Turno = {
   voluntario_1: string;
   voluntario_2: string;
   descripcion: string;
-  desbloqueado?: boolean; // jueves ya pasado que el admin ha abierto para editar
+  desbloqueado?: boolean; // día ya pasado que el admin ha abierto para editar
+  cerrado?: boolean;      // ese día el club no abre
 };
 
 /** Un jueves ya pasado queda cerrado salvo que el admin lo desbloquee. */
@@ -40,11 +41,31 @@ export function proximoJueves() {
   return iso(d);
 }
 
-export function isJueves(fecha: string) {
+/** ¿Es una fecha YYYY-MM-DD real? */
+export function isFecha(fecha: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
   const [y, m, d] = fecha.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
-  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d && dt.getDay() === 4;
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+export function isJueves(fecha: string) {
+  if (!isFecha(fecha)) return false;
+  const [y, m, d] = fecha.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay() === 4;
+}
+
+/** Jueves del año + días especiales de ese año, sin repetir y ordenados por fecha. */
+export function diasDelAno(year: number, especiales: string[] = []): string[] {
+  const set = new Set(juevesDelAno(year));
+  for (const f of especiales) if (f.startsWith(`${year}-`)) set.add(f);
+  return [...set].sort();
+}
+
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+export function diaSemana(fecha: string) {
+  const [y, m, d] = fecha.split('-').map(Number);
+  return DIAS[new Date(y, m - 1, d).getDay()];
 }
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -52,7 +73,7 @@ export const nombreMes = (m: number) => MESES[m];
 
 export function fechaLarga(fecha: string) {
   const [y, m, d] = fecha.split('-').map(Number);
-  return `jueves ${d} de ${MESES[m - 1]} de ${y}`;
+  return `${diaSemana(fecha)} ${d} de ${MESES[m - 1]} de ${y}`;
 }
 
 export function fechaCorta(fecha: string) {

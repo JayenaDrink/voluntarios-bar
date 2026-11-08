@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Header, YearBar, useYear } from '@/lib/client';
-import { Turno, fechaLarga, juevesDelAno } from '@/lib/dates';
+import { Turno, diasDelAno, fechaLarga, isJueves } from '@/lib/dates';
 
 type Nombre = { id: number; nombre: string };
 
@@ -14,14 +14,121 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export default function Admin() {
+  const [version, setVersion] = useState(0);
   return (
     <>
       <Header active="admin" admin />
       <main className="wrap">
+        <Especiales onCambio={() => setVersion((v) => v + 1)} />
         <Voluntarios />
-        <Semanas />
+        <Semanas version={version} />
       </main>
     </>
+  );
+}
+
+function Especiales({ onCambio }: { onCambio: () => void }) {
+  const [lista, setLista] = useState<string[] | null>(null);
+  const [hoy, setHoy] = useState('');
+  const [fecha, setFecha] = useState('');
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirmar, setConfirmar] = useState('');
+  const [verPasados, setVerPasados] = useState(false);
+
+  useEffect(() => {
+    api<{ especiales: string[]; hoy: string }>('/api/admin/especiales')
+      .then((j) => { setLista(j.especiales); setHoy(j.hoy); })
+      .catch((e) => setError(e.message));
+  }, []);
+
+  async function agregar(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    setOk('');
+    try {
+      await api('/api/admin/especiales', { method: 'POST', body: JSON.stringify({ fecha }) });
+      setLista((l) => [...new Set([...(l ?? []), fecha])].sort());
+      setOk(`Agregado: ${fechaLarga(fecha)}`);
+      setFecha('');
+      onCambio();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  }
+
+  async function quitar(f: string) {
+    setBusy(true);
+    setError('');
+    setOk('');
+    try {
+      await api(`/api/admin/especiales?fecha=${f}`, { method: 'DELETE' });
+      setLista((l) => l?.filter((x) => x !== f) ?? null);
+      onCambio();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+    setConfirmar('');
+  }
+
+  const esJueves = !!fecha && isJueves(fecha);
+  const visibles = (lista ?? []).filter((f) => verPasados || f >= hoy);
+  const pasados = (lista ?? []).length - (lista ?? []).filter((f) => f >= hoy).length;
+
+  return (
+    <section>
+      <h2>Días especiales</h2>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Para actividades fuera de los jueves que necesitan voluntarios. Aparecen en la lista ordenados por fecha.
+      </p>
+      <form className="card especial-form" onSubmit={agregar} style={{ marginTop: 0 }}>
+        <label className="lbl" htmlFor="esp-fecha">Fecha</label>
+        <div className="fila-form">
+          <input id="esp-fecha" type="date" className="txt" value={fecha} min={hoy || undefined}
+            onChange={(e) => { setFecha(e.target.value); setError(''); setOk(''); }} />
+          <button className="btn" disabled={busy || !fecha || esJueves}>{busy ? 'Agregando…' : 'Agregar'}</button>
+        </div>
+        {esJueves && <p className="muted small" style={{ marginBottom: 0 }}>Ese día es jueves: ya está en la lista.</p>}
+        {ok && <p className="ok small" style={{ marginBottom: 0 }}>{ok}</p>}
+        {error && <p className="err small" style={{ marginBottom: 0 }}>{error}</p>}
+      </form>
+
+      {lista && visibles.length > 0 && (
+        <table className="rep" style={{ marginTop: 12 }}>
+          <thead><tr><th>Día especial</th><th style={{ textAlign: 'right' }}>Acción</th></tr></thead>
+          <tbody>
+            {visibles.map((f) => (
+              <tr key={f}>
+                <td className="fecha" style={{ textTransform: 'capitalize' }}>{fechaLarga(f)}</td>
+                <td className="acc">
+                  {confirmar === f ? (
+                    <>
+                      <span className="small" style={{ marginRight: 8 }}>¿Quitar este día?</span>
+                      <button className="btn ghost small" onClick={() => setConfirmar('')} disabled={busy}>No</button>{' '}
+                      <button className="btn small" onClick={() => quitar(f)} disabled={busy}>Sí, quitar</button>
+                    </>
+                  ) : (
+                    <button className="btn ghost small" onClick={() => setConfirmar(f)}>Quitar</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {lista && visibles.length === 0 && <p className="muted small">No hay días especiales próximos.</p>}
+      {lista && pasados > 0 && (
+        <p style={{ marginTop: 8 }}>
+          <button className="btn ghost small" onClick={() => setVerPasados(!verPasados)}>
+            {verPasados ? 'Ocultar los ya pasados' : `Ver también los ya pasados (${pasados})`}
+          </button>
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -84,9 +191,9 @@ function Voluntarios() {
   );
 }
 
-function Semanas() {
+function Semanas({ version }: { version: number }) {
   const [year, setYear] = useYear();
-  const [datos, setDatos] = useState<{ turnos: Record<string, Turno>; hoy: string } | null>(null);
+  const [datos, setDatos] = useState<{ turnos: Record<string, Turno>; hoy: string; especiales: string[] } | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
 
@@ -94,16 +201,16 @@ function Semanas() {
     let cancel = false;
     setDatos(null);
     setError('');
-    api<{ turnos: Turno[]; hoy: string }>(`/api/admin/semanas?year=${year}`)
+    api<{ turnos: Turno[]; hoy: string; especiales: string[] }>(`/api/admin/semanas?year=${year}`)
       .then((j) => {
         if (cancel) return;
         const map: Record<string, Turno> = {};
         for (const t of j.turnos) map[t.fecha] = t;
-        setDatos({ turnos: map, hoy: j.hoy });
+        setDatos({ turnos: map, hoy: j.hoy, especiales: j.especiales ?? [] });
       })
       .catch((e) => !cancel && setError(e.message));
     return () => { cancel = true; };
-  }, [year]);
+  }, [year, version]);
 
   async function cambiar(fecha: string, desbloqueado: boolean) {
     setBusy(fecha);
@@ -120,21 +227,21 @@ function Semanas() {
     setBusy('');
   }
 
-  const pasados = datos ? juevesDelAno(year).filter((f) => f < datos.hoy).reverse() : [];
+  const pasados = datos ? diasDelAno(year, datos.especiales).filter((f) => f < datos.hoy).reverse() : [];
   const abiertos = datos ? pasados.filter((f) => datos.turnos[f]?.desbloqueado).length : 0;
 
   return (
     <section>
-      <h2>Jueves realizados</h2>
+      <h2>Días realizados</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Cuando un jueves ya pasó queda cerrado y nadie puede cambiarlo. Desbloquéalo para corregirlo y vuelve a cerrarlo después.
+        Cuando un día ya pasó queda cerrado y nadie puede cambiarlo. Desbloquéalo para corregirlo y vuelve a cerrarlo después.
       </p>
       <YearBar year={year} setYear={setYear} titulo="Año">
         {datos && <span className="stats">{abiertos} desbloqueado{abiertos === 1 ? '' : 's'}</span>}
       </YearBar>
       {error && <p className="err">{error}</p>}
       {!datos && !error && <p className="muted">Cargando…</p>}
-      {datos && pasados.length === 0 && <p className="muted">Todavía no ha pasado ningún jueves de {year}.</p>}
+      {datos && pasados.length === 0 && <p className="muted">Todavía no ha pasado ningún día de {year}.</p>}
       {datos && pasados.length > 0 && (
         <div className="tablewrap" style={{ marginTop: 12 }}>
           <table className="rep">
@@ -146,8 +253,8 @@ function Semanas() {
                 const gente = [t?.voluntario_1, t?.voluntario_2].filter(Boolean).join(' y ');
                 return (
                   <tr key={f}>
-                    <td className="fecha">{fechaLarga(f).replace('jueves ', '')}</td>
-                    <td>{gente || <span className="muted">—</span>}</td>
+                    <td className="fecha" style={{ textTransform: 'capitalize' }}>{fechaLarga(f)}{!isJueves(f) && <span className="badge especial">★</span>}</td>
+                    <td>{t?.cerrado ? <span className="muted">Club cerrado</span> : gente || <span className="muted">—</span>}</td>
                     <td>{abierto ? <span className="badge open">Desbloqueado</span> : <span className="badge lock">🔒 Cerrado</span>}</td>
                     <td className="acc">
                       <button className={`btn small${abierto ? '' : ' ghost'}`} disabled={busy === f} onClick={() => cambiar(f, !abierto)}>
