@@ -5,7 +5,13 @@ export type Turno = {
   descripcion: string;
   desbloqueado?: boolean; // día ya pasado que el admin ha abierto para editar
   cerrado?: boolean;      // ese día el club no abre
+  apertura?: string;      // quién abre (lista fija)
+  cierre?: string;        // quién cierra (lista fija)
 };
+
+/** Personas que pueden abrir / cerrar el bar. Lista fija, en orden alfabético. */
+export const RESPONSABLES = ['Alejandra', 'Carine C', 'Carine V', 'Flor', 'Mieke', 'Nick', 'Roger']
+  .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
 /** Un jueves ya pasado queda cerrado salvo que el admin lo desbloquee. */
 export const bloqueado = (t: Turno, hoy: string) => t.fecha < hoy && !t.desbloqueado;

@@ -100,12 +100,14 @@ function Tabla({ filas, vacio }: { filas: Turno[]; vacio: string }) {
   return (
     <div className="tablewrap">
       <table className="rep">
-        <thead><tr><th>Fecha</th><th>Voluntarios</th><th>Nota</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Voluntarios</th><th>Apertura</th><th>Cierre</th><th>Nota</th></tr></thead>
         <tbody>
           {filas.map((t) => (
             <tr key={t.fecha}>
               <td className="fecha">{fechaTitulo(t.fecha)}{!isJueves(t.fecha) && <span className="badge especial">★</span>}</td>
               <td>{[t.voluntario_1, t.voluntario_2].filter(Boolean).join(' y ')}</td>
+              <td>{t.apertura || <span className="muted">—</span>}</td>
+              <td>{t.cierre || <span className="muted">—</span>}</td>
               <td className="nota">{t.descripcion}</td>
             </tr>
           ))}

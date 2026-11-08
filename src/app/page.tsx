@@ -1,9 +1,9 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header, YearBar, useTurnos, useYear } from '@/lib/client';
-import { Turno, bloqueado, diaSemana, diasDelAno, hoyISO, isJueves, nombreMes, proximoJueves } from '@/lib/dates';
+import { RESPONSABLES, Turno, bloqueado, diaSemana, diasDelAno, hoyISO, isJueves, nombreMes, proximoJueves } from '@/lib/dates';
 
-const vacio = (fecha: string): Turno => ({ fecha, voluntario_1: '', voluntario_2: '', descripcion: '' });
+const vacio = (fecha: string): Turno => ({ fecha, voluntario_1: '', voluntario_2: '', descripcion: '', apertura: '', cierre: '' });
 
 export default function Lista() {
   // Por defecto, el año del próximo jueves (así a finales de diciembre ya enseña enero)
@@ -85,10 +85,11 @@ function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
   const [t, setT] = useState(inicial);
   const [estado, setEstado] = useState<'' | 'guardando' | 'ok' | string>('');
   // Solo resetear cuando cambian los datos guardados (no en cada render del padre)
-  useEffect(() => setT(inicial), [inicial.voluntario_1, inicial.voluntario_2, inicial.descripcion, inicial.cerrado]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setT(inicial), [inicial.voluntario_1, inicial.voluntario_2, inicial.descripcion, inicial.apertura, inicial.cierre, inicial.cerrado]); // eslint-disable-line react-hooks/exhaustive-deps
   const [cambiando, setCambiando] = useState(false);
 
-  const dirty = t.voluntario_1 !== inicial.voluntario_1 || t.voluntario_2 !== inicial.voluntario_2 || t.descripcion !== inicial.descripcion;
+  const dirty = t.voluntario_1 !== inicial.voluntario_1 || t.voluntario_2 !== inicial.voluntario_2 || t.descripcion !== inicial.descripcion
+    || (t.apertura ?? '') !== (inicial.apertura ?? '') || (t.cierre ?? '') !== (inicial.cierre ?? '');
   const pasado = t.fecha < hoy;
   const bloq = bloqueado(inicial, hoy);          // día pasado sin desbloquear
   const clubCerrado = !!inicial.cerrado;         // ese día no abre el club
@@ -142,6 +143,20 @@ function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
     );
   };
 
+  // Apertura / Cierre: lista fija, sin "agregar"
+  const responsable = (k: 'apertura' | 'cierre', etiqueta: string) => {
+    const valor = t[k] ?? '';
+    return (
+      <label className="campo">
+        <span className="campo-etq">{etiqueta}</span>
+        <select className={`txt${valor ? '' : ' vacio'}`} aria-label={etiqueta} value={valor} disabled={bloq} onChange={(e) => cambiar(k, e.target.value)}>
+          <option value="">{bloq ? '—' : `— ${etiqueta} —`}</option>
+          {RESPONSABLES.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </label>
+    );
+  };
+
   return (
     <div id={`j-${t.fecha}`} className={`turno${conGente && !clubCerrado ? ' asignado' : ''}${especial ? ' especial' : ''}${clubCerrado ? ' club-cerrado' : ''}${pasado ? ' past' : ''}${t.fecha === hoy ? ' today' : ''}${dirty ? ' dirty' : ''}`}>
       <div className="head">
@@ -178,6 +193,10 @@ function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
           <textarea className="txt" rows={1} placeholder="Nota (opcional)" aria-label="Descripción" readOnly={bloq}
             value={t.descripcion} onChange={(e) => cambiar('descripcion', e.target.value)} />
         )}
+        <div className="names apertura-cierre">
+          {responsable('apertura', 'Apertura')}
+          {responsable('cierre', 'Cierre')}
+        </div>
         {(dirty || estado) && (
           <div className="foot">
             {estado === 'ok' && <span className="ok">Guardado ✓</span>}

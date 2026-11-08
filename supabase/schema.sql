@@ -39,3 +39,7 @@ create table if not exists public.bar_dias_especiales (
 );
 alter table public.bar_dias_especiales enable row level security;
 revoke all on table public.bar_dias_especiales from anon, authenticated;
+
+-- Quién abre y quién cierra (lista fija en la app)
+alter table public.bar_voluntarios add column if not exists apertura text not null default '';
+alter table public.bar_voluntarios add column if not exists cierre   text not null default '';

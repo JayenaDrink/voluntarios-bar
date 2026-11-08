@@ -156,3 +156,8 @@ table.rep td.acc { text-align: right; white-space: nowrap; }
 /* Admin: formulario de día especial */
 .fila-form { display: flex; gap: 8px; }
 .fila-form input { flex: 1; }
+
+/* Apertura / Cierre */
+.apertura-cierre { margin-top: 8px; }
+.campo { display: block; }
+.campo-etq { display: block; font-family: var(--f-mono); font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); margin: 0 0 3px 2px; }

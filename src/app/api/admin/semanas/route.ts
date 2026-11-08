@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const year = Number(req.nextUrl.searchParams.get('year')) || new Date().getFullYear();
   const { data, error } = await db()
     .from(TABLE)
-    .select('fecha, voluntario_1, voluntario_2, descripcion, desbloqueado, cerrado')
+    .select('fecha, voluntario_1, voluntario_2, descripcion, apertura, cierre, desbloqueado, cerrado')
     .gte('fecha', `${year}-01-01`)
     .lte('fecha', `${year}-12-31`)
     .order('fecha');
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: actual, error: e1 } = await db()
       .from(TABLE)
-      .select('voluntario_1, voluntario_2, descripcion, cerrado')
+      .select('voluntario_1, voluntario_2, descripcion, apertura, cierre, cerrado')
       .eq('fecha', fecha)
       .maybeSingle();
     if (e1) return err(e1.message, 500);
@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Al volver a cerrar un día vacío, se borra la fila
-    if (!desbloqueado && !actual.voluntario_1 && !actual.voluntario_2 && !actual.descripcion && !actual.cerrado) {
+    if (!desbloqueado && !actual.voluntario_1 && !actual.voluntario_2 && !actual.descripcion && !actual.apertura && !actual.cierre && !actual.cerrado) {
       const { error } = await db().from(TABLE).delete().eq('fecha', fecha);
       if (error) return err(error.message, 500);
       return NextResponse.json({ ok: true, desbloqueado: false });

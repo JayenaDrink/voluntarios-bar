@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, TABLE } from '@/lib/db';
-import { hoyMadrid } from '@/lib/dates';
+import { RESPONSABLES, hoyMadrid } from '@/lib/dates';
 import { esDiaValido, especialesDelAno } from '@/lib/dias';
 
 export const dynamic = 'force-dynamic';
 
 const clean = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
-const COLS = 'fecha, voluntario_1, voluntario_2, descripcion, desbloqueado, cerrado';
+const COLS = 'fecha, voluntario_1, voluntario_2, descripcion, apertura, cierre, desbloqueado, cerrado';
+/** Solo se aceptan nombres de la lista fija (o vacío). */
+const responsable = (v: unknown) => { const s = String(v ?? '').trim(); return RESPONSABLES.includes(s) ? s : ''; };
 const err = (msg: string, status: number) => NextResponse.json({ error: msg }, { status });
 
 /** GET /api/jueves?year=2027 → filas guardadas de ese año y sus días especiales. */
@@ -26,14 +28,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-type Fila = { voluntario_1?: string; voluntario_2?: string; descripcion?: string; desbloqueado?: boolean; cerrado?: boolean };
+type Fila = { voluntario_1?: string; voluntario_2?: string; descripcion?: string; apertura?: string; cierre?: string; desbloqueado?: boolean; cerrado?: boolean };
 
 /** Comprueba que el día existe y se puede editar (los pasados solo si el admin los desbloqueó). */
 async function editable(fecha: string): Promise<{ actual: Fila | null } | { error: NextResponse }> {
   if (!(await esDiaValido(fecha))) return { error: err('Ese día no es un jueves ni un día especial', 400) };
   const { data, error } = await db()
     .from(TABLE)
-    .select('voluntario_1, voluntario_2, descripcion, desbloqueado, cerrado')
+    .select('voluntario_1, voluntario_2, descripcion, apertura, cierre, desbloqueado, cerrado')
     .eq('fecha', fecha)
     .maybeSingle();
   if (error) return { error: err(error.message, 500) };
@@ -43,7 +45,7 @@ async function editable(fecha: string): Promise<{ actual: Fila | null } | { erro
   return { actual: data as Fila | null };
 }
 
-const vacia = (r: Fila) => !r.voluntario_1 && !r.voluntario_2 && !r.descripcion && !r.desbloqueado && !r.cerrado;
+const vacia = (r: Fila) => !r.voluntario_1 && !r.voluntario_2 && !r.descripcion && !r.apertura && !r.cierre && !r.desbloqueado && !r.cerrado;
 
 /** PUT /api/jueves → guarda voluntarios y nota de un día. */
 export async function PUT(req: NextRequest) {
@@ -57,6 +59,8 @@ export async function PUT(req: NextRequest) {
       voluntario_1: clean(body.voluntario_1, 80),
       voluntario_2: clean(body.voluntario_2, 80),
       descripcion: clean(body.descripcion, 1000),
+      apertura: responsable(body.apertura),
+      cierre: responsable(body.cierre),
       updated_at: new Date().toISOString(),
     };
     const turno = { ...row, desbloqueado: !!r.actual?.desbloqueado, cerrado: !!r.actual?.cerrado };
@@ -103,6 +107,8 @@ export async function PATCH(req: NextRequest) {
         voluntario_1: a?.voluntario_1 ?? '',
         voluntario_2: a?.voluntario_2 ?? '',
         descripcion: a?.descripcion ?? '',
+        apertura: a?.apertura ?? '',
+        cierre: a?.cierre ?? '',
         desbloqueado: !!a?.desbloqueado,
         cerrado,
       },
