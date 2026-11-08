@@ -23,7 +23,8 @@ body {
 button { font: inherit; cursor: pointer; }
 .wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 80px; }
 h1 { font-size: 1.6rem; margin: 8px 0 4px; }
-h2 { font-size: 1.15rem; margin: 28px 0 8px; text-transform: capitalize; }
+h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+h2.mes { text-transform: capitalize; }
 .muted { color: var(--muted); }
 .small { font-size: .9rem; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-top: 16px; }

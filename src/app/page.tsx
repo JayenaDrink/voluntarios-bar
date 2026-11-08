@@ -56,7 +56,7 @@ export default function Lista() {
 
       {turnos && porMes.map(({ mes, fechas }) => (
         <section key={mes}>
-          <h2>{nombreMes(mes)}</h2>
+          <h2 className="mes">{nombreMes(mes)}</h2>
           {fechas.map((f) => (
             <Fila key={f} inicial={turnos[f] ?? vacio(f)} hoy={hoy}
               onSaved={(t) => setTurnos((prev) => ({ ...prev, [t.fecha]: t }))} />
