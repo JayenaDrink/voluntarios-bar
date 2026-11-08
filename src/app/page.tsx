@@ -1,17 +1,20 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Nav, YearBar, useTurnos, useYear } from '@/lib/client';
-import { Turno, fechaLarga, hoyISO, juevesDelAno, nombreMes } from '@/lib/dates';
+import { Turno, fechaLarga, hoyISO, juevesDelAno, nombreMes, proximoJueves } from '@/lib/dates';
 
 const vacio = (fecha: string): Turno => ({ fecha, voluntario_1: '', voluntario_2: '', descripcion: '' });
 
 export default function Lista() {
-  const [year, setYear] = useYear();
+  // Por defecto, el año del próximo jueves (así a finales de diciembre ya enseña enero)
+  const [year, setYear] = useYear(() => Number(proximoJueves().slice(0, 4)));
   const { turnos, setTurnos, error } = useTurnos(year);
+  const [verPasados, setVerPasados] = useState(false);
   const hoy = hoyISO();
-  const fechas = useMemo(() => juevesDelAno(year), [year]);
-  const proximo = fechas.find((f) => f >= hoy);
-  const scrolled = useRef<number | null>(null);
+  const todas = useMemo(() => juevesDelAno(year), [year]);
+  const pasados = todas.filter((f) => f < hoy).length;
+  // Solo desde el próximo jueves (hoy incluido si es jueves); los anteriores, a petición
+  const fechas = verPasados ? todas : todas.filter((f) => f >= hoy);
 
   // Nombres ya usados → sugerencias al escribir
   const nombres = useMemo(() => {
@@ -21,13 +24,6 @@ export default function Lista() {
   }, [turnos]);
 
   const cubiertos = fechas.filter((f) => turnos?.[f]?.voluntario_1 || turnos?.[f]?.voluntario_2).length;
-
-  // Al abrir, ir al próximo jueves
-  useEffect(() => {
-    if (!turnos || scrolled.current === year || !proximo) return;
-    scrolled.current = year;
-    document.getElementById(`j-${proximo}`)?.scrollIntoView({ block: 'start' });
-  }, [turnos, year, proximo]);
 
   const porMes: { mes: number; fechas: string[] }[] = [];
   for (const f of fechas) {
@@ -39,20 +35,16 @@ export default function Lista() {
   return (
     <main className="wrap">
       <Nav active="lista" />
-      <YearBar year={year} setYear={setYear}>
-        {proximo && (
-          <button className="btn ghost" style={{ width: 'auto', height: 'auto' }}
-            onClick={() => document.getElementById(`j-${proximo}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            Próximo jueves
-          </button>
-        )}
-        {turnos && <span className="stats muted small">{cubiertos} de {fechas.length} jueves con voluntarios</span>}
+      <YearBar year={year} setYear={(y) => { setYear(y); setVerPasados(false); }}>
+        {turnos && fechas.length > 0 && <span className="stats muted small">{cubiertos} de {fechas.length} jueves con voluntarios</span>}
       </YearBar>
 
       {error && <p className="err">{error}</p>}
       {!turnos && !error && <p className="muted">Cargando…</p>}
 
       <datalist id="nombres">{nombres.map((n) => <option key={n} value={n} />)}</datalist>
+
+      {turnos && fechas.length === 0 && <p className="muted">Todos los jueves de {year} ya han pasado.</p>}
 
       {turnos && porMes.map(({ mes, fechas }) => (
         <section key={mes}>
@@ -63,6 +55,14 @@ export default function Lista() {
           ))}
         </section>
       ))}
+
+      {turnos && pasados > 0 && (
+        <p style={{ textAlign: 'center', marginTop: 24 }}>
+          <button className="btn ghost" onClick={() => setVerPasados(!verPasados)}>
+            {verPasados ? 'Ocultar jueves anteriores' : `Ver jueves anteriores (${pasados})`}
+          </button>
+        </p>
+      )}
     </main>
   );
 }

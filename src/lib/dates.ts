@@ -24,6 +24,13 @@ export function hoyISO() {
   return iso(new Date());
 }
 
+/** Próximo jueves (hoy mismo si hoy es jueves). */
+export function proximoJueves() {
+  const d = new Date();
+  d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7));
+  return iso(d);
+}
+
 export function isJueves(fecha: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
   const [y, m, d] = fecha.split('-').map(Number);

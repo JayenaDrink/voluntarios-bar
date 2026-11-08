@@ -32,8 +32,8 @@ export function YearBar({ year, setYear, children }: { year: number; setYear: (y
 }
 
 /** Año elegido, recordado en la URL (?year=) */
-export function useYear(): [number, (y: number) => void] {
-  const [year, setYearState] = useState(() => new Date().getFullYear());
+export function useYear(defecto: () => number = () => new Date().getFullYear()): [number, (y: number) => void] {
+  const [year, setYearState] = useState(defecto);
   useEffect(() => {
     const y = Number(new URLSearchParams(window.location.search).get('year'));
     if (y > 2000 && y < 2100) setYearState(y);
