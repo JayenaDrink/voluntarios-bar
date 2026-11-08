@@ -29,9 +29,9 @@ h2.mes { text-transform: capitalize; }
 .small { font-size: .9rem; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-top: 16px; }
 label.lbl { display: block; font-weight: 600; margin-bottom: 6px; }
-input.txt, textarea.txt { width: 100%; font: inherit; font-size: 1rem; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); }
+input.txt, textarea.txt, select.txt { width: 100%; font: inherit; font-size: 1rem; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); }
 textarea.txt { resize: vertical; min-height: 42px; }
-input.txt:focus, textarea.txt:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+input.txt:focus, textarea.txt:focus, select.txt:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
 .btn { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 700; text-decoration: none; display: inline-block; }
 .btn:disabled { opacity: .45; cursor: default; }
 .btn.ghost { background: transparent; color: var(--accent); border: 2px solid var(--accent); padding: 8px 14px; }
