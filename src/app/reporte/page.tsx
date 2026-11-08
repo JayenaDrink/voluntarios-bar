@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import { Header, YearBar, useTurnos, useYear } from '@/lib/client';
-import { Turno, diasDelAno, fechaCorta, fechaLarga, hoyISO, isJueves } from '@/lib/dates';
+import { Turno, diasDelAno, fechaCorta, fechaTitulo, hoyISO, isJueves } from '@/lib/dates';
 
 export default function Reporte() {
   const [year, setYear] = useYear();
@@ -104,7 +104,7 @@ function Tabla({ filas, vacio }: { filas: Turno[]; vacio: string }) {
         <tbody>
           {filas.map((t) => (
             <tr key={t.fecha}>
-              <td className="fecha" style={{ textTransform: 'capitalize' }}>{fechaLarga(t.fecha)}{!isJueves(t.fecha) && <span className="badge especial">★</span>}</td>
+              <td className="fecha">{fechaTitulo(t.fecha)}{!isJueves(t.fecha) && <span className="badge especial">★</span>}</td>
               <td>{[t.voluntario_1, t.voluntario_2].filter(Boolean).join(' y ')}</td>
               <td className="nota">{t.descripcion}</td>
             </tr>

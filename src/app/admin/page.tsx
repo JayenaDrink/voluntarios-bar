@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Header, YearBar, useYear } from '@/lib/client';
-import { Turno, diasDelAno, fechaLarga, isJueves } from '@/lib/dates';
+import { Turno, diasDelAno, fechaLarga, fechaTitulo, isJueves } from '@/lib/dates';
 
 type Nombre = { id: number; nombre: string };
 
@@ -103,7 +103,7 @@ function Especiales({ onCambio }: { onCambio: () => void }) {
           <tbody>
             {visibles.map((f) => (
               <tr key={f}>
-                <td className="fecha" style={{ textTransform: 'capitalize' }}>{fechaLarga(f)}</td>
+                <td className="fecha">{fechaTitulo(f)}</td>
                 <td className="acc">
                   {confirmar === f ? (
                     <>
@@ -253,7 +253,7 @@ function Semanas({ version }: { version: number }) {
                 const gente = [t?.voluntario_1, t?.voluntario_2].filter(Boolean).join(' y ');
                 return (
                   <tr key={f}>
-                    <td className="fecha" style={{ textTransform: 'capitalize' }}>{fechaLarga(f)}{!isJueves(f) && <span className="badge especial">★</span>}</td>
+                    <td className="fecha">{fechaTitulo(f)}{!isJueves(f) && <span className="badge especial">★</span>}</td>
                     <td>{t?.cerrado ? <span className="muted">Club cerrado</span> : gente || <span className="muted">—</span>}</td>
                     <td>{abierto ? <span className="badge open">Desbloqueado</span> : <span className="badge lock">🔒 Cerrado</span>}</td>
                     <td className="acc">

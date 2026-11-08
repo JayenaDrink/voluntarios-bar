@@ -80,3 +80,9 @@ export function fechaCorta(fecha: string) {
   const [, m, d] = fecha.split('-').map(Number);
   return `${d} ${MESES[m - 1].slice(0, 3)}`;
 }
+
+/** "Sábado 21 de noviembre de 2026" (solo la primera letra en mayúscula). */
+export function fechaTitulo(fecha: string) {
+  const s = fechaLarga(fecha);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
