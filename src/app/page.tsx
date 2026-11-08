@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Nav, YearBar, useTurnos, useYear } from '@/lib/client';
 import { Turno, fechaLarga, hoyISO, juevesDelAno, nombreMes, proximoJueves } from '@/lib/dates';
 
@@ -16,12 +16,15 @@ export default function Lista() {
   // Solo desde el próximo jueves (hoy incluido si es jueves); los anteriores, a petición
   const fechas = verPasados ? todas : todas.filter((f) => f >= hoy);
 
-  // Nombres ya usados → sugerencias al escribir
-  const nombres = useMemo(() => {
-    const s = new Set<string>();
-    Object.values(turnos ?? {}).forEach((t) => { if (t.voluntario_1) s.add(t.voluntario_1); if (t.voluntario_2) s.add(t.voluntario_2); });
-    return [...s].sort((a, b) => a.localeCompare(b, 'es'));
-  }, [turnos]);
+  // Lista de voluntarios para los desplegables (orden alfabético, viene del servidor)
+  const [nombres, setNombres] = useState<string[]>([]);
+  useEffect(() => {
+    fetch('/api/nombres', { cache: 'no-store' }).then((r) => r.json()).then((j) => j.nombres && setNombres(j.nombres)).catch(() => {});
+  }, []);
+
+  // Popup "Agregar uno nuevo": devuelve el nombre agregado, o null si se cancela
+  const [popup, setPopup] = useState<((n: string | null) => void) | null>(null);
+  const pedirNombre = useCallback(() => new Promise<string | null>((resolve) => setPopup(() => resolve)), []);
 
   const cubiertos = fechas.filter((f) => turnos?.[f]?.voluntario_1 || turnos?.[f]?.voluntario_2).length;
 
@@ -42,7 +45,10 @@ export default function Lista() {
       {error && <p className="err">{error}</p>}
       {!turnos && !error && <p className="muted">Cargando…</p>}
 
-      <datalist id="nombres">{nombres.map((n) => <option key={n} value={n} />)}</datalist>
+      {popup && (
+        <NuevoVoluntario
+          onCerrar={(nombre, lista) => { if (lista) setNombres(lista); popup(nombre); setPopup(null); }} />
+      )}
 
       {turnos && fechas.length === 0 && <p className="muted">Todos los jueves de {year} ya han pasado.</p>}
 
@@ -50,7 +56,7 @@ export default function Lista() {
         <section key={mes}>
           <h2 className="mes">{nombreMes(mes)}</h2>
           {fechas.map((f) => (
-            <Fila key={f} inicial={turnos[f] ?? vacio(f)} hoy={hoy}
+            <Fila key={f} inicial={turnos[f] ?? vacio(f)} hoy={hoy} nombres={nombres} pedirNombre={pedirNombre}
               onSaved={(t) => setTurnos((prev) => ({ ...prev, [t.fecha]: t }))} />
           ))}
         </section>
@@ -67,7 +73,11 @@ export default function Lista() {
   );
 }
 
-function Fila({ inicial, hoy, onSaved }: { inicial: Turno; hoy: string; onSaved: (t: Turno) => void }) {
+const NUEVO = '__nuevo__';
+
+function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
+  inicial: Turno; hoy: string; nombres: string[]; pedirNombre: () => Promise<string | null>; onSaved: (t: Turno) => void;
+}) {
   const [t, setT] = useState(inicial);
   const [estado, setEstado] = useState<'' | 'guardando' | 'ok' | string>('');
   // Solo resetear cuando cambian los datos guardados (no en cada render del padre)
@@ -88,9 +98,28 @@ function Fila({ inicial, hoy, onSaved }: { inicial: Turno; hoy: string; onSaved:
     setTimeout(() => setEstado((e) => (e === 'ok' ? '' : e)), 2500);
   }
 
-  const set = (k: keyof Turno) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setT({ ...t, [k]: e.target.value });
+  const cambiar = (k: keyof Turno, v: string) => {
+    setT((prev) => ({ ...prev, [k]: v }));
     if (estado && estado !== 'guardando') setEstado('');
+  };
+
+  async function elegir(k: 'voluntario_1' | 'voluntario_2', v: string) {
+    if (v !== NUEVO) return cambiar(k, v);
+    const nuevo = await pedirNombre();
+    if (nuevo) cambiar(k, nuevo);
+  }
+
+  const desplegable = (k: 'voluntario_1' | 'voluntario_2', etiqueta: string) => {
+    const valor = t[k];
+    // Si hay un nombre guardado que ya no está en la lista, se sigue mostrando
+    const opciones = valor && !nombres.includes(valor) ? [...nombres, valor] : nombres;
+    return (
+      <select className={`txt${valor ? '' : ' vacio'}`} aria-label={etiqueta} value={valor} onChange={(e) => elegir(k, e.target.value)}>
+        <option value="">— {etiqueta} —</option>
+        <option value={NUEVO}>➕ Agregar uno nuevo…</option>
+        {opciones.map((n) => <option key={n} value={n}>{n}</option>)}
+      </select>
+    );
   };
 
   return (
@@ -103,10 +132,10 @@ function Fila({ inicial, hoy, onSaved }: { inicial: Turno; hoy: string; onSaved:
       </div>
       <form onSubmit={(e) => { e.preventDefault(); if (dirty) guardar(); }}>
         <div className="names">
-          <input className="txt" list="nombres" placeholder="Voluntario 1" aria-label="Voluntario 1" value={t.voluntario_1} onChange={set('voluntario_1')} />
-          <input className="txt" list="nombres" placeholder="Voluntario 2" aria-label="Voluntario 2" value={t.voluntario_2} onChange={set('voluntario_2')} />
+          {desplegable('voluntario_1', 'Voluntario 1')}
+          {desplegable('voluntario_2', 'Voluntario 2')}
         </div>
-        <textarea className="txt" rows={1} placeholder="Nota (opcional)" aria-label="Descripción" value={t.descripcion} onChange={set('descripcion')} />
+        <textarea className="txt" rows={1} placeholder="Nota (opcional)" aria-label="Descripción" value={t.descripcion} onChange={(e) => cambiar('descripcion', e.target.value)} />
         {(dirty || estado) && (
           <div className="foot">
             {estado === 'ok' && <span className="ok">Guardado ✓</span>}
@@ -115,6 +144,47 @@ function Fila({ inicial, hoy, onSaved }: { inicial: Turno; hoy: string; onSaved:
             {dirty && <button className="btn" disabled={estado === 'guardando'}>{estado === 'guardando' ? 'Guardando…' : 'Guardar'}</button>}
           </div>
         )}
+      </form>
+    </div>
+  );
+}
+
+function NuevoVoluntario({ onCerrar }: { onCerrar: (nombre: string | null, lista?: string[]) => void }) {
+  const [nombre, setNombre] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    input.current?.focus();
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(null); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onCerrar]);
+
+  async function agregar(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    const res = await fetch('/api/nombres', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    if (!res.ok) { setErr(j.error || 'No se pudo agregar'); setBusy(false); return; }
+    onCerrar(j.nombre, j.nombres);
+  }
+
+  return (
+    <div className="modal-fondo" onClick={(e) => { if (e.target === e.currentTarget) onCerrar(null); }}>
+      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="nv-titulo" onSubmit={agregar}>
+        <h3 id="nv-titulo">Nuevo voluntario</h3>
+        <label className="lbl" htmlFor="nv-nombre">Nombre</label>
+        <input id="nv-nombre" ref={input} className="txt" value={nombre} maxLength={80} autoComplete="off"
+          onChange={(e) => setNombre(e.target.value)} />
+        {err && <p className="err">{err}</p>}
+        <div className="modal-botones">
+          <button type="button" className="btn ghost" onClick={() => onCerrar(null)}>Cancelar</button>
+          <button className="btn" disabled={busy || !nombre.trim()}>{busy ? 'Agregando…' : 'Agregar'}</button>
+        </div>
       </form>
     </div>
   );
