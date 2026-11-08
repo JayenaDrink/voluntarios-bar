@@ -3,7 +3,11 @@ export type Turno = {
   voluntario_1: string;
   voluntario_2: string;
   descripcion: string;
+  desbloqueado?: boolean; // jueves ya pasado que el admin ha abierto para editar
 };
+
+/** Un jueves ya pasado queda cerrado salvo que el admin lo desbloquee. */
+export const bloqueado = (t: Turno, hoy: string) => t.fecha < hoy && !t.desbloqueado;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -22,6 +26,11 @@ export function juevesDelAno(year: number): string[] {
 
 export function hoyISO() {
   return iso(new Date());
+}
+
+/** Hoy en España (para el servidor, que corre en UTC). */
+export function hoyMadrid() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
 /** Próximo jueves (hoy mismo si hoy es jueves). */

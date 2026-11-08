@@ -26,3 +26,6 @@ revoke all on table public.bar_voluntarios_nombres from anon, authenticated;
 insert into public.bar_voluntarios_nombres (nombre) values
   ('Alejandra'),('Jan'),('Ingrid'),('Mieke'),('Roger'),('Nick'),('Flor'),('Paul'),('Francine'),('Soni'),('Leen')
 on conflict do nothing;
+
+-- Jueves ya pasados: cerrados salvo que el admin los desbloquee
+alter table public.bar_voluntarios add column if not exists desbloqueado boolean not null default false;

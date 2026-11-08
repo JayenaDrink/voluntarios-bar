@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, TABLE } from '@/lib/db';
-import { isJueves } from '@/lib/dates';
+import { hoyMadrid, isJueves } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic';
 
 const clean = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
+const COLS = 'fecha, voluntario_1, voluntario_2, descripcion, desbloqueado';
 
 /** GET /api/jueves?year=2027 → filas guardadas de ese año. */
 export async function GET(req: NextRequest) {
   const year = Number(req.nextUrl.searchParams.get('year')) || new Date().getFullYear();
   const { data, error } = await db()
     .from(TABLE)
-    .select('fecha, voluntario_1, voluntario_2, descripcion')
+    .select(COLS)
     .gte('fecha', `${year}-01-01`)
     .lte('fecha', `${year}-12-31`)
     .order('fecha');
@@ -19,11 +20,18 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ turnos: data });
 }
 
-/** PUT /api/jueves → guarda (o borra si queda vacío) un jueves. */
+/** PUT /api/jueves → guarda un jueves. Los jueves ya pasados solo si el admin los desbloqueó. */
 export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const fecha = String(body?.fecha ?? '');
   if (!isJueves(fecha)) return NextResponse.json({ error: 'La fecha debe ser un jueves' }, { status: 400 });
+
+  const { data: actual, error: e1 } = await db().from(TABLE).select('desbloqueado').eq('fecha', fecha).maybeSingle();
+  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
+  const desbloqueado = !!actual?.desbloqueado;
+  if (fecha < hoyMadrid() && !desbloqueado) {
+    return NextResponse.json({ error: 'Este jueves ya pasó y está cerrado. Pide al admin que lo desbloquee.' }, { status: 403 });
+  }
 
   const row = {
     fecha,
@@ -33,13 +41,15 @@ export async function PUT(req: NextRequest) {
     updated_at: new Date().toISOString(),
   };
 
-  if (!row.voluntario_1 && !row.voluntario_2 && !row.descripcion) {
+  // Vacío y sin desbloqueo → no hace falta guardar la fila
+  if (!row.voluntario_1 && !row.voluntario_2 && !row.descripcion && !desbloqueado) {
     const { error } = await db().from(TABLE).delete().eq('fecha', fecha);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, turno: { ...row } });
+    return NextResponse.json({ ok: true, turno: { ...row, desbloqueado } });
   }
 
+  // El upsert no toca "desbloqueado": solo lo cambia el admin
   const { error } = await db().from(TABLE).upsert(row, { onConflict: 'fecha' });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, turno: row });
+  return NextResponse.json({ ok: true, turno: { ...row, desbloqueado } });
 }

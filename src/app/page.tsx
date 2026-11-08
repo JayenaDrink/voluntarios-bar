@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Nav, YearBar, useTurnos, useYear } from '@/lib/client';
-import { Turno, fechaLarga, hoyISO, juevesDelAno, nombreMes, proximoJueves } from '@/lib/dates';
+import { Header, YearBar, useTurnos, useYear } from '@/lib/client';
+import { Turno, bloqueado, hoyISO, juevesDelAno, nombreMes, proximoJueves } from '@/lib/dates';
 
 const vacio = (fecha: string): Turno => ({ fecha, voluntario_1: '', voluntario_2: '', descripcion: '' });
 
@@ -36,10 +36,11 @@ export default function Lista() {
   }
 
   return (
+    <>
+    <Header active="lista" />
     <main className="wrap">
-      <Nav active="lista" />
-      <YearBar year={year} setYear={(y) => { setYear(y); setVerPasados(false); }}>
-        {turnos && fechas.length > 0 && <span className="stats muted small">{cubiertos} de {fechas.length} jueves con voluntarios</span>}
+      <YearBar year={year} setYear={(y) => { setYear(y); setVerPasados(false); }} titulo="Turnos del bar">
+        {turnos && fechas.length > 0 && <span className="stats">{cubiertos} de {fechas.length} cubiertos</span>}
       </YearBar>
 
       {error && <p className="err">{error}</p>}
@@ -54,7 +55,7 @@ export default function Lista() {
 
       {turnos && porMes.map(({ mes, fechas }) => (
         <section key={mes}>
-          <h2 className="mes">{nombreMes(mes)}</h2>
+          <h2>{nombreMes(mes)}</h2>
           {fechas.map((f) => (
             <Fila key={f} inicial={turnos[f] ?? vacio(f)} hoy={hoy} nombres={nombres} pedirNombre={pedirNombre}
               onSaved={(t) => setTurnos((prev) => ({ ...prev, [t.fecha]: t }))} />
@@ -70,6 +71,7 @@ export default function Lista() {
         </p>
       )}
     </main>
+    </>
   );
 }
 
@@ -85,7 +87,9 @@ function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
 
   const dirty = t.voluntario_1 !== inicial.voluntario_1 || t.voluntario_2 !== inicial.voluntario_2 || t.descripcion !== inicial.descripcion;
   const pasado = t.fecha < hoy;
+  const cerrado = bloqueado(inicial, hoy);
   const conGente = inicial.voluntario_1 || inicial.voluntario_2;
+  const [, mesTxt, diaTxt] = t.fecha.split('-').map(Number);
 
   async function guardar() {
     setEstado('guardando');
@@ -114,8 +118,8 @@ function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
     // Si hay un nombre guardado que ya no está en la lista, se sigue mostrando
     const opciones = valor && !nombres.includes(valor) ? [...nombres, valor] : nombres;
     return (
-      <select className={`txt${valor ? '' : ' vacio'}`} aria-label={etiqueta} value={valor} onChange={(e) => elegir(k, e.target.value)}>
-        <option value="">— {etiqueta} —</option>
+      <select className={`txt${valor ? '' : ' vacio'}`} aria-label={etiqueta} value={valor} disabled={cerrado} onChange={(e) => elegir(k, e.target.value)}>
+        <option value="">{cerrado ? '—' : `— ${etiqueta} —`}</option>
         <option value={NUEVO}>➕ Agregar uno nuevo…</option>
         {opciones.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
@@ -123,19 +127,26 @@ function Fila({ inicial, hoy, nombres, pedirNombre, onSaved }: {
   };
 
   return (
-    <div id={`j-${t.fecha}`} className={`turno${pasado ? ' past' : ''}${t.fecha === hoy ? ' today' : ''}${dirty ? ' dirty' : ''}`}>
+    <div id={`j-${t.fecha}`} className={`turno${conGente ? ' asignado' : ''}${pasado ? ' past' : ''}${t.fecha === hoy ? ' today' : ''}${dirty ? ' dirty' : ''}`}>
       <div className="head">
-        <span className="date">{fechaLarga(t.fecha)}</span>
-        {conGente
-          ? <span className={`badge${pasado ? ' done' : ''}`}>{pasado ? 'Trabajó' : 'Asignado'}</span>
-          : <span className="badge empty">{pasado ? 'Sin datos' : 'Libre'}</span>}
+        <span className="date"><span className="dia">Jueves</span>{diaTxt} de {nombreMes(mesTxt - 1)}</span>
+        {pasado
+          ? (cerrado
+            ? <span className="badge lock">🔒 {conGente ? 'Trabajó' : 'Cerrado'}</span>
+            : <span className="badge open">Desbloqueado</span>)
+          : (conGente
+            ? <span className="badge">Asignado</span>
+            : <span className="badge empty">Libre</span>)}
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); if (dirty) guardar(); }}>
+      <form onSubmit={(e) => { e.preventDefault(); if (dirty && !cerrado) guardar(); }}>
         <div className="names">
           {desplegable('voluntario_1', 'Voluntario 1')}
           {desplegable('voluntario_2', 'Voluntario 2')}
         </div>
-        <textarea className="txt" rows={1} placeholder="Nota (opcional)" aria-label="Descripción" value={t.descripcion} onChange={(e) => cambiar('descripcion', e.target.value)} />
+        {(!cerrado || t.descripcion) && (
+          <textarea className="txt" rows={1} placeholder="Nota (opcional)" aria-label="Descripción" readOnly={cerrado}
+            value={t.descripcion} onChange={(e) => cambiar('descripcion', e.target.value)} />
+        )}
         {(dirty || estado) && (
           <div className="foot">
             {estado === 'ok' && <span className="ok">Guardado ✓</span>}
@@ -177,13 +188,15 @@ function NuevoVoluntario({ onCerrar }: { onCerrar: (nombre: string | null, lista
     <div className="modal-fondo" onClick={(e) => { if (e.target === e.currentTarget) onCerrar(null); }}>
       <form className="modal" role="dialog" aria-modal="true" aria-labelledby="nv-titulo" onSubmit={agregar}>
         <h3 id="nv-titulo">Nuevo voluntario</h3>
-        <label className="lbl" htmlFor="nv-nombre">Nombre</label>
-        <input id="nv-nombre" ref={input} className="txt" value={nombre} maxLength={80} autoComplete="off"
-          onChange={(e) => setNombre(e.target.value)} />
-        {err && <p className="err">{err}</p>}
-        <div className="modal-botones">
-          <button type="button" className="btn ghost" onClick={() => onCerrar(null)}>Cancelar</button>
-          <button className="btn" disabled={busy || !nombre.trim()}>{busy ? 'Agregando…' : 'Agregar'}</button>
+        <div className="cuerpo">
+          <label className="lbl" htmlFor="nv-nombre">Nombre</label>
+          <input id="nv-nombre" ref={input} className="txt" value={nombre} maxLength={80} autoComplete="off"
+            onChange={(e) => setNombre(e.target.value)} />
+          {err && <p className="err">{err}</p>}
+          <div className="modal-botones">
+            <button type="button" className="btn ghost" onClick={() => onCerrar(null)}>Cancelar</button>
+            <button className="btn" disabled={busy || !nombre.trim()}>{busy ? 'Agregando…' : 'Agregar'}</button>
+          </div>
         </div>
       </form>
     </div>

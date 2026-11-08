@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { Nav, YearBar, useTurnos, useYear } from '@/lib/client';
+import { Header, YearBar, useTurnos, useYear } from '@/lib/client';
 import { Turno, fechaCorta, fechaLarga, hoyISO, juevesDelAno } from '@/lib/dates';
 
 export default function Reporte() {
@@ -34,11 +34,12 @@ export default function Reporte() {
   }, [turnos, year, hoy]);
 
   return (
+    <>
+    <Header active="reporte" />
     <main className="wrap">
-      <Nav active="reporte" />
-      <h1 className="print-only">Voluntarios del bar · reporte</h1>
-      <YearBar year={year} setYear={setYear}>
-        <button className="btn ghost noprint" style={{ width: 'auto', height: 'auto', marginLeft: 'auto' }} onClick={() => window.print()}>Imprimir / PDF</button>
+      <h1 className="print-only">Amistades Belgas de Levante · Voluntarios del bar</h1>
+      <YearBar year={year} setYear={setYear} titulo="Reporte">
+        <button className="btn ghost small noprint" style={{ marginLeft: 'auto' }} onClick={() => window.print()}>Imprimir / PDF</button>
       </YearBar>
 
       {error && <p className="err">{error}</p>}
@@ -84,6 +85,7 @@ export default function Reporte() {
         </>
       )}
     </main>
+    </>
   );
 }
 
@@ -96,7 +98,7 @@ function Tabla({ filas, vacio }: { filas: Turno[]; vacio: string }) {
         <tbody>
           {filas.map((t) => (
             <tr key={t.fecha}>
-              <td style={{ whiteSpace: 'nowrap' }}>{fechaLarga(t.fecha).replace('jueves ', '')}</td>
+              <td className="fecha">{fechaLarga(t.fecha).replace('jueves ', '')}</td>
               <td>{[t.voluntario_1, t.voluntario_2].filter(Boolean).join(' y ')}</td>
               <td className="nota">{t.descripcion}</td>
             </tr>
